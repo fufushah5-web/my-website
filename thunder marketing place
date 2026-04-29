@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="ur">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>JUNG - Fighting Arena</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@700;900&family=Rajdhani:wght@500;600;700&display=swap" rel="stylesheet">
+    <style>
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{background:#000;display:flex;justify-content:center;align-items:center;min-height:100vh;overflow:hidden}
+        canvas{display:block;max-width:100vw;max-height:100vh;cursor:default}
+    </style>
+</head>
+<body>
+<canvas id="gc" width="960" height="540"></canvas>
+<script>
+/* ===== سیٹ اپ ===== */
+const C=document.getElementById('gc'),X=C.getContext('2d'),W=960,H=540;
+const GND=H-80,GRAV=0.55,SPD=4.5,JMPF=-12.5;
+
+/* ===== انپُٹ ===== */
+const keys={},jp=new Set();
+addEventListener('keydown',e=>{if(!keys[e.code])jp.add(e.code);keys[e.code]=true;e.preventDefault()});
+addEventListener('keyup',e=>{keys[e.code]=false});
+
+/* ===== گیم اسٹیٹ ===== */
+let gState='menu',round=1,timer=99,tFrames=0;
+let ann={text:'',sub:'',t:0,mx:0},koTimer=0;
+let particles=[],dust=[];
+let shk={x:0,y:0,a:0,d:0},ts=1,tsD=0,fla=0;
+let menuT=0;
+
+/* پس منظر کی دھول */
+for(let i=0;i<55;i++) dust.push({x:Math.random()*W,y:Math.random()*H,s:Math.random()*2+.5,sp:Math.random()*.3+.08,a:Math.random()*.25+.05,dr:(Math.random()-.5)*.15});
+
+/* شہر کی عمارتیں */
+const blds=[];
+for(let i=0;i<28;i++) blds.push({x:i*(W/27)-10,w:Math.random()*45+18,h:Math.random()*130+35,lit:Math.random()>.6,flicker:Math.random()*100});
+
+/* ===== پارٹیکل سسٹم ===== */
+function spawnP(x,y,n,col,type){
+    for(let i=0;i<n;i++){
+        const a=Math.random()*Math.PI*2;
+        let sp,vm,dc,sz,gv;
+        if(type==='impact'){sp=Math.random()*9+3;vm=-2.5;dc=Math.random()*.022+.012;sz=Math.random()*5+2;gv=.18}
+        else if(type==='spark'){sp=Math.random()*5+1;vm=-1;dc=Math.random()*.04+.025;sz=Math.random()*3+1;gv=.12}
+        else{sp=Math.random()*2+.4;vm=-1.5;dc=Math.random()*.03+.02;sz=Math.random()*4+2;gv=.02}
+        particles.push({x,y,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp+vm,life:1,dc,sz,col,type,gv});
+    }
+}
+function updP(){
+    for(let i=particles.length-1;i>=0;i--){
+        const p=particles[i];
+        p.x+=p.vx;p.y+=p.vy;p.vy+=p.gv;p.vx*=.97;p.life-=p.dc;
+        if(p.life<=0)particles.splice(i,1);
+    }
+}
+function drwP(){
+    particles.forEach(p=>{
+        X.globalAlpha=Math.max(0,p.life);
+        X.fillStyle=p.col;
+        if(p.type==='impact'){
+            const s=p.sz*p.life;
+            X.beginPath();
+            for(let i=0;i<4;i++){const an=Math.PI/2*i;X.lineTo(p.x+Math.cos(an)*s,p.y+Math.sin(an)*s);X.lineTo(p.x+Math.cos(an+Math.PI/4)*s*.35,p.y+Math.sin(an+Math.PI/4)*s*.35)}
+            X.closePath();X.fill();
+        }else{X.beginPath();X.arc(p.x,p.y,Math.max(.5,p.sz*p.life),0,Math.PI*2);X.fill()}
+    });
+    X.globalAlpha=1;
+}
+
+/* ===== فائٹر کلاس ===== */
+class Fighter{
+    constructor(sx,nm,col,ctrl){
+        this.sx=sx;this.nm=nm;this.col=col;this.ctrl=ctrl;
+        this.x=sx;this.y=GND;this.vx=0;this.vy=0;
+        this.hp=100;this.dhp=100;this.wins=0;
+        this.st='idle';this.stT=0;this.face=1;this.gnd=true;
+        this.hitF=false;this.fl=0;this.combo=0;this.comboT=0;this.t=0;
+    }
+    reset(){
+        this.x=this.sx;this.y=GND;this.vx=0;this.vy=0;
+        this.hp=100;this.dhp=100;this.st='idle';this.stT=0;
+        this.gnd=true;this.hitF=false;this.fl=0;this.combo=0;this.comboT=0;
+    }
+    atkBox(){
+        if(this.st==='punch'&&this.stT>=4&&this.stT<=10) return{x:this.x+this.face*25,y:this.y-72,w:48,h:24};
+        if(this.st==='kick'&&this.stT>=7&&this.stT<=15) return{x:this.x+this.face*18,y:this.y-38,w:58,h:30};
+        return null;
+    }
+    hurtBox(){return{x:this.x-24,y:this.y-98,w:48,h:98}}
+    update(opp){
+        this.t++;
+        if(this.fl>0)this.fl--;
+        if(this.comboT>0){this.comboT--;if(this.comboT<=0)this.combo=0}
+        this.dhp+=(this.hp-this.dhp)*.08;
+        if(this.st!=='ko')this.face=opp.x>this.x?1:-1;
+        this.stT++;
+        switch(this.st){
+            case'idle':case'walk':this._mv();break;
+            case'jump':
+                this.vy+=GRAV;
+                if(keys[this.ctrl.l])this.vx=-SPD*.7;
+                else if(keys[this.ctrl.r])this.vx=SPD*.7;
+                if(this.y>=GND){this.y=GND;this.vy=0;this.gnd=true;this.st='idle';this.stT=0;spawnP(this.x,GND,6,'#998877','dust')}
+                break;
+            case'punch':if(this.stT>18){this.st='idle';this.stT=0;this.hitF=false}break;
+            case'kick':if(this.stT>26){this.st='idle';this.stT=0;this.hitF=false}break;
+            case'block':if(!keys[this.ctrl.d]){this.st='idle';this.stT=0}break;
+            case'hit':this.vx*=.84;if(this.stT>14){this.st='idle';this.stT=0}break;
+            case'ko':this.vy+=GRAV;this.vx*=.91;if(this.y>=GND){this.y=GND;this.vy=0;this.vx=0;spawnP(this.x,GND,10,'#998877','dust')}break;
+        }
+        this.x+=this.vx;this.y+=this.vy;
+        if(this.st==='idle')this.vx*=.72;
+        if(this.st==='walk')this.vx*=.84;
+        this.x=Math.max(38,Math.min(W-38,this.x));
+        const d=Math.abs(this.x-opp.x);
+        if(d<48&&!['ko','hit'].includes(this.st)&&!['ko','hit'].includes(opp.st)){
+            const p=(48-d)/2;
+            if(this.x<opp.x){this.x-=p;opp.x+=p}else{this.x+=p;opp.x-=p}
+        }
+    }
+    _mv(){
+        if(keys[this.ctrl.d]&&this.gnd){this.st='block';this.stT=0;this.vx=0;return}
+        if(jp.has(this.ctrl.p)&&this.gnd){this.st='punch';this.stT=0;this.hitF=false;this.vx=0;return}
+        if(jp.has(this.ctrl.k)&&this.gnd){this.st='kick';this.stT=0;this.hitF=false;this.vx=0;return}
+        if(keys[this.ctrl.u]&&this.gnd){this.st='jump';this.stT=0;this.vy=JMPF;this.gnd=false;return}
+        let mv=false;
+        if(keys[this.ctrl.l]){this.vx=-SPD;mv=true}else if(keys[this.ctrl.r]){this.vx=SPD;mv=true}
+        if(mv&&this.st!=='walk'){this.st='walk';this.stT=0}
+        else if(!mv&&this.st==='walk'){this.st='idle';this.stT=0}
+    }
+    takeHit(dmg,dir){
+        if(this.st==='block'){
+            this.hp-=Math.ceil(dmg*.15);this.vx=dir*3;
+            spawnP(this.x-dir*20,this.y-55,7,'#88ddff','spark');
+            return false;
+        }
+        this.hp-=dmg;this.st='hit';this.stT=0;this.vx=dir*7;this.vy=-3;this.fl=8;
+        spawnP(this.x+dir*15,this.y-55,14,'#fff','impact');
+        spawnP(this.x+dir*15,this.y-55,10,this.col.glow,'impact');
+        shk.a=7;shk.d=8;ts=.22;tsD=6;fla=.3;
+        if(this.hp<=0){
+            this.hp=0;this.st='ko';this.stT=0;this.vx=dir*9;this.vy=-9;
+            shk.a=15;shk.d=25;ts=.1;tsD=18;fla=.5;
+            spawnP(this.x,this.y-50,40,'#fff','impact');
+            spawnP(this.x,this.y-50,30,this.col.glow,'impact');
+            return true;
+        }
+        return false;
+    }
+}
+
+/* پلیئر 1: AGNI (آگ) | پلیئر 2: NEER (پانی) */
+const p1=new Fighter(280,'AGNI',{body:'#a02820',limb:'#d44035',accent:'#ff6630',glow:'#ff4422',skin:'#e8b89d'},{l:'KeyA',r:'KeyD',u:'KeyW',d:'KeyS',p:'KeyF',k:'KeyG'});
+const p2=new Fighter(680,'NEER',{body:'#0e5c4a',limb:'#18a070',accent:'#00ddaa',glow:'#00ffcc',skin:'#d4a87c'},{l:'ArrowLeft',r:'ArrowRight',u:'ArrowUp',d:'ArrowDown',p:'KeyK',k:'KeyL'});
+
+/* ===== پوز سسٹم ===== */
+function lp(a,b,t){const r={};for(const k in a){if(typeof a[k]==='object')r[k]={x:a[k].x+(b[k].x-a[k].x)*t,y:a[k].y+(b[k].y-a[k].y)*t};else r[k]=a[k]+(b[k]-a[k])*t}return r}
+
+function idleP(t){
+    const br=Math.sin(t*.06)*2,sw=Math.sin(t*.04);
+    return{hd:{x:sw,y:-92+br*.5},sL:{x:-15,y:-74+br*.3},sR:{x:15,y:-74+br*.3},eL:{x:-22,y:-56+br*.2},eR:{x:22,y:-56+br*.2},hL:{x:-18+sw,y:-43},hR:{x:18+sw,y:-43},hiL:{x:-10,y:-36},hiR:{x:10,y:-36},kL:{x:-13,y:-18},kR:{x:13,y:-18},fL:{x:-15,y:0},fR:{x:15,y:0}}
+}
+function walkP(t){
+    const c=Math.sin(t*.18),as=c*13,ls=c*11;
+    return{hd:{x:0,y:-90},sL:{x:-15,y:-72},sR:{x:15,y:-72},eL:{x:-15-as*.5,y:-55},eR:{x:15+as*.5,y:-55},hL:{x:-12-as,y:-42},hR:{x:12+as,y:-42},hiL:{x:-10,y:-35},hiR:{x:10,y:-35},kL:{x:-10+ls*.5,y:-18},kR:{x:10-ls*.5,y:-18},fL:{x:-12+ls,y:0},fR:{x:12-ls,y:0}}
+}
+function jumpP(){return{hd:{x:0,y:-88},sL:{x:-15,y:-70},sR:{x:15,y:-70},eL:{x:-24,y:-78},eR:{x:24,y:-78},hL:{x:-20,y:-86},hR:{x:20,y:-86},hiL:{x:-10,y:-34},hiR:{x:10,y:-34},kL:{x:-16,y:-22},kR:{x:16,y:-22},fL:{x:-10,y:-14},fR:{x:10,y:-14}}
+}
+function punchP(){return{hd:{x:5,y:-90},sL:{x:-15,y:-72},sR:{x:17,y:-72},eL:{x:-22,y:-58},eR:{x:36,y:-70},hL:{x:-18,y:-45},hR:{x:60,y:-68},hiL:{x:-10,y:-36},hiR:{x:10,y:-36},kL:{x:-15,y:-18},kR:{x:15,y:-18},fL:{x:-18,y:0},fR:{x:18,y:0}}
+}
+function kickP(){return{hd:{x:-6,y:-87},sL:{x:-15,y:-69},sR:{x:15,y:-69},eL:{x:-28,y:-58},eR:{x:8,y:-54},hL:{x:-32,y:-46},hR:{x:4,y:-40},hiL:{x:-10,y:-33},hiR:{x:12,y:-33},kL:{x:-14,y:-16},kR:{x:36,y:-30},fL:{x:-16,y:0},fR:{x:64,y:-30}}
+}
+function blockP(){return{hd:{x:-3,y:-84},sL:{x:-12,y:-67},sR:{x:13,y:-67},eL:{x:-4,y:-58},eR:{x:10,y:-60},hL:{x:9,y:-74},hR:{x:16,y:-71},hiL:{x:-10,y:-30},hiR:{x:10,y:-30},kL:{x:-17,y:-14},kR:{x:15,y:-14},fL:{x:-21,y:0},fR:{x:19,y:0}}
+}
+function hitP(){return{hd:{x:-8,y:-85},sL:{x:-18,y:-67},sR:{x:8,y:-67},eL:{x:-30,y:-54},eR:{x:-5,y:-51},hL:{x:-36,y:-44},hR:{x:-16,y:-39},hiL:{x:-10,y:-35},hiR:{x:10,y:-35},kL:{x:-14,y:-18},kR:{x:14,y:-18},fL:{x:-16,y:0},fR:{x:16,y:0}}
+}
+function koP(t){
+    const f=Math.min(t/22,1);
+    return{hd:{x:-30*f,y:-92+86*f},sL:{x:-15-16*f,y:-74+78*f},sR:{x:15-16*f,y:-74+78*f},eL:{x:-25-22*f,y:-55+72*f},eR:{x:20-26*f,y:-55+68*f},hL:{x:-30-26*f,y:-42+66*f},hR:{x:25-30*f,y:-42+62*f},hiL:{x:-10-6*f,y:-36+33*f},hiR:{x:10-6*f,y:-36+33*f},kL:{x:-14,y:-18+17*f},kR:{x:14,y:-18+17*f},fL:{x:-16,y:0},fR:{x:16,y:0}}
+}
+
+function getPose(f){
+    const id=idleP(f.t);
+    switch(f.st){
+        case'idle':return id;
+        case'walk':return walkP(f.t);
+        case'jump':return jumpP();
+        case'punch':{const pk=punchP();if(f.stT<4)return lp(id,pk,f.stT/4);if(f.stT<=10)return pk;return lp(pk,id,(f.stT-10)/8)}
+        case'kick':{const kk=kickP();if(f.stT<7)return lp(id,kk,f.stT/7);if(f.stT<=15)return kk;return lp(kk,id,(f.stT-15)/11)}
+        case'block':return lp(id,blockP(),Math.min(f.stT/5,1));
+        case'hit':{const hp=hitP();if(f.stT<4)return lp(id,hp,f.stT/4);return lp(hp,id,(f.stT-4)/10)}
+        case'ko':return koP(f.stT);
+        default:return id;
+    }
+}
+
+/* ===== فائٹر ڈرائینگ ===== */
+function limb(a,b,w,col){X.beginPath();X.moveTo(a.x,a.y);X.lineTo(b.x,b.y);X.strokeStyle=col;X.lineWidth=w;X.lineCap='round';X.stroke()}
+
+function drawF(f){
+    const ps=getPose(f),c=f.col;
+    X.save();X.translate(f.x,f.y);
+    const fw=f.fl>0&&f.fl%2===0;
+    const bc=fw?'#fff':c.body,lc=fw?'#fff':c.limb,sk=fw?'#fff':c.skin;
+
+    /* سایہ */
+    X.fillStyle='rgba(0,0,0,.25)';X.beginPath();X.ellipse(0,3,28,6,0,0,Math.PI*2);X.fill();
+
+    /* گلو ایفیکٹ */
+    if(f.st==='punch'||f.st==='kick'){X.shadowColor=c.glow;X.shadowBlur=22}
+
+    /* ٹانگیں */
+    limb(ps.hiL,ps.kL,12,bc);limb(ps.kL,ps.fL,10,lc);
+    limb(ps.hiR,ps.kR,12,bc);limb(ps.kR,ps.fR,10,lc);
+
+    /* بدن */
+    X.fillStyle=bc;X.beginPath();
+    X.moveTo(ps.sL.x-5,ps.sL.y);X.lineTo(ps.sR.x+5,ps.sR.y);
+    X.lineTo(ps.hiR.x+7,ps.hiR.y);X.lineTo(ps.hiL.x-7,ps.hiL.y);
+    X.closePath();X.fill();
+
+    /* بازو */
+    limb(ps.sL,ps.eL,10,lc);limb(ps.eL,ps.hL,8,lc);
+    limb(ps.sR,ps.eR,10,lc);limb(ps.eR,ps.hR,8,lc);
+
+    /* مٹکیں */
+    X.fillStyle=sk;
+    X.beginPath();X.arc(ps.hL.x,ps.hL.y,6.5,0,Math.PI*2);X.fill();
+    X.beginPath();X.arc(ps.hR.x,ps.hR.y,6.5,0,Math.PI*2);X.fill();
+
+    /* سر */
+    X.beginPath();X.arc(ps.hd.x,ps.hd.y,14,0,Math.PI*2);X.fill();
+
+    X.shadowColor='transparent';X.shadowBlur=0;
+
+    if(!fw){
+        /* آنکھ */
+        X.fillStyle='#1a1a1a';X.beginPath();X.arc(ps.hd.x+f.face*5,ps.hd.y-2,2.5,0,Math.PI*2);X.fill();
+        /* ہیڈ بینڈ */
+        X.strokeStyle=c.accent;X.lineWidth=3;X.beginPath();X.arc(ps.hd.x,ps.hd.y,14,-Math.PI*.8,Math.PI*.1);X.stroke();
+        /* دم */
+        const tx=ps.hd.x-f.face*14,ty=ps.hd.y-8;
+        X.beginPath();X.moveTo(tx,ty);
+        X.quadraticCurveTo(tx-f.face*12,ty-5+Math.sin(f.t*.1)*3,tx-f.face*20,ty-1+Math.sin(f.t*.1+1)*4);
+        X.lineWidth=2.5;X.stroke();
+    }
+
+    /* حرکت کی لکییریں */
+    if((f.st==='punch'&&f.stT>=4&&f.stT<=10)||(f.st==='kick'&&f.stT>=7&&f.stT<=15)){
+        const hand=f.st==='punch'?ps.hR:ps.fR;
+        X.globalAlpha=.55;X.strokeStyle=c.glow;X.lineWidth=2;
+        for(let i=0;i<3;i++){const o=i*5;X.beginPath();X.moveTo(hand.x-f.face*(6+o),hand.y-6+i*6);X.lineTo(hand.x-f.face*(18+o*2),hand.y-6+i*6);X.stroke()}
+        X.globalAlpha=1;
+    }
+
+    /* بلاک شیلڈ */
+    if(f.st==='block'){
+        X.globalAlpha=.2+Math.sin(f.t*.15)*.08;
+        X.strokeStyle=c.accent;X.lineWidth=3;
+        X.beginPath();X.arc(f.face*18,-55,22,-Math.PI*.6,Math.PI*.6);X.stroke();
+        X.globalAlpha=1;
+    }
+
+    X.restore();
+
+    /* کمبو کاؤنٹر */
+    if(f.combo>1){
+        X.save();X.font=`bold ${20+f.combo*2}px Rajdhani`;X.fillStyle=c.accent;
+        X.globalAlpha=Math.min(f.comboT/15,1);X.textAlign='center';
+        X.shadowColor=c.glow;X.shadowBlur=10;
+        X.fillText(`${f.combo} COMBO!`,f.x,f.y-125);
+        X.restore();
+    }
+}
+
+/* ===== ہٹ ڈیٹیکشن ===== */
+function aabb(a,b){return a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y}
+
+function checkHits(){
+    [p1,p2].forEach((atk,i)=>{
+        const def=i===0?p2:p1;
+        if(atk.hitF)return;
+        const ab=atk.atkBox();if(!ab)return;
+        const db=def.hurtBox();
+        if(aabb(ab,db)){
+            atk.hitF=true;
+            const dir=atk.face,dmg=atk.st==='punch'?8:14;
+            atk.combo++;atk.comboT=60;
+            def.takeHit(dmg,dir);
+        }
+    });
+}
+
+/* ===== پس منظر ===== */
+function drawBg(){
+    const g=X.createLinearGradient(0,0,0,H);
+    g.addColorStop(0,'#07070e');g.addColorStop(.5,'#0d0d18');g.addColorStop(1,'#181425');
+    X.fillStyle=g;X.fillRect(0,0,W,H);
+
+    /* چاند */
+    X.fillStyle='#252040';X.beginPath();X.arc(W*.78,H*.13,38,0,Math.PI*2);X.fill();
+    X.fillStyle='#353058';X.beginPath();X.arc(W*.78,H*.13,32,0,Math.PI*2);X.fill();
+    X.fillStyle='#454068';X.beginPath();X.arc(W*.78,H*.13,26,0,Math.PI*2);X.fill();
+
+    /* شہر */
+    blds.forEach(b=>{
+        X.fillStyle='#0b0b14';X.fillRect(b.x,GND-80-b.h,b.w,b.h+80);
+        if(b.lit){
+            b.flicker+=.05;
+            const on=Math.sin(b.flicker)>.1;
+            if(on){
+                X.fillStyle='rgba(255,200,100,.15)';
+                X.fillRect(b.x+4,GND-80-b.h+8,5,5);
+                X.fillRect(b.x+b.w-9,GND-80-b.h+20,5,5);
+            }
+        }
+    });
+
+    /* دھول کے ذرات */
+    dust.forEach(d=>{
+        d.y-=d.sp;d.x+=d.dr+Math.sin(d.y*.01)*.08;
+        if(d.y<-5){d.y=H+5;d.x=Math.random()*W}
+        X.fillStyle=`rgba(255,190,140,${d.a})`;X.beginPath();X.arc(d.x,d.y,d.s,0,Math.PI*2);X.fill();
+    });
+
+    /* زمین */
+    const gg=X.createLinearGradient(0,GND,0,H);
+    gg.addColorStop(0,'#181420');gg.addColorStop(1,'#0c0810');
+    X.fillStyle=gg;X.fillRect(0,GND,W,H-GND);
+
+    /* زمین لائن */
+    X.strokeStyle='rgba(255,100,50,.2)';X.lineWidth=2;
+    X.beginPath();X.moveTo(0,GND);X.lineTo(W,GND);X.stroke();
+
+    /* زمین کی نشانياں */
+    X.strokeStyle='rgba(255,100,50,.06)';X.lineWidth=1;
+    for(let i=0;i<W;i+=55){X.beginPath();X.moveTo(i,GND+6);X.lineTo(i+28,GND+6);X.stroke()}
+
+    /* ارینا گلو */
+    const ag=X.createRadialGradient(W/2,GND,40,W/2,GND,420);
+    ag.addColorStop(0,'rgba(255,90,40,.05)');ag.addColorStop(1,'rgba(255,90,40,0)');
+    X.fillStyle=ag;X.fillRect(0,GND-120,W,240);
+
+    /* ونیٹ */
+    const vg=X.createRadialGradient(W/2,H/2,H*.35,W/2,H/2,H*.85);
+    vg.addColorStop(0,'rgba(0,0,0,0)');vg.addColorStop(1,'rgba(0,0,0,.45)');
+    X.fillStyle=vg;X.fillRect(0,0,W,H);
+}
+
+/* ===== UI ===== */
+function drawUI(){
+    const bW=340,bH=22,bY=28;
+
+    /* P1 ہیلتھ بار */
+    X.fillStyle='#14141e';X.fillRect(28,bY,bW,bH);
+    X.fillStyle='rgba(255,70,50,.3)';X.fillRect(28,bY,(p1.dhp/100)*bW,bH);
+    const g1=X.createLinearGradient(28,0,28+bW,0);
+    g1.addColorStop(0,'#ff6630');g1.addColorStop(1,'#e74c3c');
+    X.fillStyle=g1;X.fillRect(28,bY,(p1.hp/100)*bW,bH);
+    X.strokeStyle='rgba(255,102,51,.35)';X.lineWidth=1.5;X.strokeRect(28,bY,bW,bH);
+    /* بارک ہیلتھ */
+    X.fillStyle='#1a1a22';X.fillRect(28,bY+2,bW,bH-4);
+    X.fillStyle='rgba(255,70,50,.2)';X.fillRect(28,bY+2,(p1.dhp/100)*bW,bH-4);
+    X.fillStyle=g1;X.fillRect(28,bY+2,(p1.hp/100)*bW,bH-4);
+
+    /* P2 ہیلتھ بار */
+    const p2x=W-28-bW;
+    X.fillStyle='#14141e';X.fillRect(p2x,bY,bW,bH);
+    X.fillStyle='rgba(0,220,170,.25)';X.fillRect(p2x,bY,(p2.dhp/100)*bW,bH);
+    const g2=X.createLinearGradient(p2x,0,p2x+bW,0);
+    g2.addColorStop(0,'#00cc88');g2.addColorStop(1,'#00ddaa');
+    X.fillStyle=g2;X.fillRect(p2x,bY,(p2.hp/100)*bW,bH);
+    X.strokeStyle='rgba(0,221,170,.35)';X.lineWidth=1.5;X.strokeRect(p2x,bY,bW,bH);
+    X.fillStyle='#1a1a22';X.fillRect(p2x,bY+2,bW,bH-4);
+    X.fillStyle='rgba(0,220,170,.18)';X.fillRect(p2x,bY+2,(p2.dhp/100)*bW,bH-4);
+    X.fillStyle=g2;X.fillRect(p2x,bY+2,(p2.hp/100)*bW,bH-4);
+
+    /* نام */
+    X.font='bold 17px Orbitron';X.textAlign='left';X.fillStyle='#ff6630';X.fillText(p1.nm,30,bY-5);
+    X.textAlign='right';X.fillStyle='#00ddaa';X.fillText(p2.nm,W-30,bY-5);
+
+    /* ٹائمر */
+    X.textAlign='center';X.font='bold 30px Orbitron';
+    X.fillStyle=timer<=10?`rgba(255,60,60,${.7+Math.sin(Date.now()*.01)*.3})`:'#f0e6d3';
+    X.fillText(String(Math.max(0,Math.ceil(timer))).padStart(2,'0'),W/2,bY+22);
+
+    /* راؤنڈ */
+    X.font='600 13px Rajdhani';X.fillStyle='rgba(240,230,211,.45)';
+    X.fillText(`ROUND ${round}`,W/2,bY-6);
+
+    /* وِن ڈٹس */
+    for(let i=0;i<2;i++){
+        X.fillStyle=i<p1.wins?'#ff6630':'#2a2a2a';
+        X.beginPath();X.arc(30+i*18,bY+bH+14,5,0,Math.PI*2);X.fill();
+        X.fillStyle=i<p2.wins?'#00ddaa':'#2a2a2a';
+        X.beginPath();X.arc(W-30-i*18,bY+bH+14,5,0,Math.PI*2);X.fill();
+    }
+
+    /* کنٹرولز ہنٹ */
+    X.font='500 11px Rajdhani';X.fillStyle='rgba(240,230,211,.2)';
+    X.textAlign='left';X.fillText('P1: WASD + F/G Punch/Kick | S Block',16,H-10);
+    X.textAlign='right';X.fillText('P2: Arrows + K/L Punch/Kick | Down Block',W-16,H-10);
+}
+
+function drawAnn(){
+    if(ann.t>=ann.mx||ann.mx===0)return;
+    const p=ann.t/ann.mx;
+    let sc=1,al=1;
+    if(p<.12){sc=p/.12*1.35;al=p/.12}
+    else if(p<.22){sc=1.35-(p-.12)/.1*.35;al=1}
+    else if(p>.7)al=1-(p-.7)/.3;
+
+    X.save();X.globalAlpha=al;X.textAlign='center';X.textBaseline='middle';
+    X.shadowColor='rgba(255,100,50,.5)';X.shadowBlur=35;
+    X.font=`900 ${58*sc}px Orbitron`;X.fillStyle='#f0e6d3';
+    X.fillText(ann.text,W/2,H/2-18);
+    X.shadowBlur=0;
+    if(ann.sub){X.font=`600 ${21*sc}px Rajdhani`;X.fillStyle='#ff6630';X.fillText(ann.sub,W/2,H/2+28)}
+    X.restore();
+}
+
+/* ===== مینو ===== */
+function drawMenu(){
+    drawBg();menuT+=.03;
+    X.save();X.textAlign='center';X.textBaseline='middle';
+    X.shadowColor='#ff6630';X.shadowBlur=50;
+    X.font='900 76px Orbitron';X.fillStyle='#f0e6d3';
+    X.fillText('JUNG',W/2,H*.3);X.shadowBlur=0;
+    X.font='600 24px Rajdhani';X.fillStyle='rgba(255,102,48,.45)';
+    X.fillText('FIGHTING ARENA',W/2,H*.4);
+
+    /* VS ڈسپلے */
+    X.font='700 30px Rajdhani';
+    X.textAlign='right';X.fillStyle=p1.col.accent;X.fillText(p1.nm,W/2-45,H*.56);
+    X.textAlign='center';X.fillStyle='rgba(240,230,211,.25)';X.font='900 26px Orbitron';X.fillText('VS',W/2,H*.56);
+    X.textAlign='left';X.fillStyle=p2.col.accent;X.font='700 30px Rajdhani';X.fillText(p2.nm,W/2+45,H*.56);
+
+    /* فائٹرز کی چھوٹی جھلکیں */
+    X.globalAlpha=.3;
+    const fp1=idleP(Date.now()*.06),fp2=idleP(Date.now()*.06+50);
+    X.save();X.translate(W/2-100,H*.72);drawMiniF(fp1,p1.col,1);X.restore();
+    X.save();X.translate(W/2+100,H*.72);drawMiniF(fp2,p2.col,-1);X.restore();
+    X.globalAlpha=1;
+
+    const bl=Math.sin(menuT*3)*.5+.5;
+    X.globalAlpha=bl;X.font='600 19px Rajdhani';X.fillStyle='#f0e6d3';X.textAlign='center';
+    X.fillText('PRESS ENTER TO FIGHT',W/2,H*.88);X.globalAlpha=1;
+
+    X.font='500 13px Rajdhani';X.fillStyle='rgba(240,230,211,.3)';
+    X.fillText('Best of 3 Rounds',W/2,H*.93);
+    X.restore();
+}
+
+function drawMiniF(ps,c,face){
+    const bc=c.body,lc=c.limb,sk=c.skin;
+    limb(ps.hiL,ps.kL,8,bc);limb(ps.kL,ps.fL,
