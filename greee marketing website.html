@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Catalyst — Performance Marketing That Scales</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=Playfair+Display:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+  <style>
+    :root {
+      --bg: #080b10;
+      --bg2: #0d1117;
+      --bg3: #131920;
+      --fg: #eaeef4;
+      --fg2: #c0c8d4;
+      --muted: #6b7a8d;
+      --accent: #00d4aa;
+      --accent2: #00b894;
+      --accent-glow: rgba(0, 212, 170, 0.15);
+      --hot: #ff6b4a;
+      --gold: #f5c542;
+      --card: #111820;
+      --border: #1e2730;
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html { scroll-behavior:smooth; scrollbar-width:thin; scrollbar-color:var(--accent) var(--bg); }
+    body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--fg); overflow-x:hidden; }
+    h1,h2,h3,h4,.display { font-family:'Playfair Display',serif; }
+
+    /* Grain */
+    .grain { position:fixed; inset:0; z-index:9990; pointer-events:none; opacity:0.025;
+      background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 512 512' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+    }
+
+    /* Cursor */
+    .cur-dot { width:6px;height:6px;background:var(--accent);border-radius:50%;position:fixed;pointer-events:none;z-index:9999;transition:transform .08s; }
+    .cur-ring { width:36px;height:36px;border:1.5px solid var(--fg);border-radius:50%;position:fixed;pointer-events:none;z-index:9998;transition:width .3s,height .3s,border-color .3s;transform:translate(-50%,-50%); }
+    .cur-ring.hov { width:60px;height:60px;border-color:var(--accent); }
+    @media(max-width:768px){ .cur-dot,.cur-ring{display:none;} }
+
+    /* Nav */
+    nav { position:fixed;top:0;left:0;right:0;z-index:100;padding:18px 0;transition:all .4s; }
+    nav.scrolled { background:rgba(8,11,16,0.85);backdrop-filter:blur(24px);padding:12px 0;border-bottom:1px solid var(--border); }
+
+    /* Hero */
+    .hero-grid { position:absolute;inset:0;z-index:0;
+      background-image:
+        linear-gradient(rgba(0,212,170,0.04) 1px,transparent 1px),
+        linear-gradient(90deg,rgba(0,212,170,0.04) 1px,transparent 1px);
+      background-size:80px 80px;
+      mask-image:radial-gradient(ellipse 70% 60% at 50% 40%,black,transparent);
+    }
+    .hero-glow { position:absolute;width:700px;height:700px;border-radius:50%;filter:blur(160px);opacity:0.2; }
+    .hero-glow.g1 { background:var(--accent);top:-20%;left:20%;animation:gFloat 14s ease-in-out infinite alternate; }
+    .hero-glow.g2 { background:var(--hot);bottom:-30%;right:10%;animation:gFloat 11s ease-in-out infinite alternate-reverse; }
+    @keyframes gFloat { 0%{transform:translate(0,0) scale(1)} 50%{transform:translate(40px,-30px) scale(1.1)} 100%{transform:translate(-20px,20px) scale(.95)} }
+
+    /* Floating badges */
+    .float-badge { position:absolute;padding:12px 20px;border-radius:14px;background:rgba(17,24,32,0.85);border:1px solid var(--border);backdrop-filter:blur(12px);display:flex;align-items:center;gap:10px;font-size:.82rem;font-weight:600;animation:badgeFloat 6s ease-in-out infinite; }
+    @keyframes badgeFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-14px)} }
+
+    /* Reveal */
+    .rv { opacity:0;transform:translateY(40px);transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1); }
+    .rv.vis { opacity:1;transform:translateY(0); }
+    .rv-d1{transition-delay:.1s}.rv-d2{transition-delay:.2s}.rv-d3{transition-delay:.3s}.rv-d4{transition-delay:.4s}.rv-d5{transition-delay:.5s}
+
+    /* Marquee */
+    .mtrack { display:flex;width:max-content;animation:mq 35s linear infinite; }
+    @keyframes mq { 0%{transform:translateX(0)} 100%{transform:translateX(-50%)} }
+
+    /* Metric cards */
+    .metric-card { background:var(--card);border:1px solid var(--border);border-radius:20px;padding:32px;position:relative;overflow:hidden;transition:transform .4s,border-color .4s,box-shadow .4s; }
+    .metric-card:hover { transform:translateY(-6px);border-color:var(--accent);box-shadow:0 20px 50px rgba(0,212,170,0.08); }
+    .metric-card .mc-icon { width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;margin-bottom:18px; }
+    .metric-num { font-family:'Playfair Display',serif;font-size:2.8rem;font-weight:800;line-height:1; }
+
+    /* Service rows */
+    .svc-row { display:grid;grid-template-columns:60px 1fr auto;align-items:center;gap:24px;padding:28px 32px;border-radius:16px;border:1px solid var(--border);background:var(--card);transition:all .4s;cursor:default; }
+    .svc-row:hover { border-color:var(--accent);background:var(--bg3);transform:translateX(8px); }
+    .svc-row .svc-ico { width:48px;height:48px;border-radius:12px;background:var(--accent-glow);display:flex;align-items:center;justify-content:center;color:var(--accent);font-size:1.15rem;transition:all .3s; }
+    .svc-row:hover .svc-ico { background:var(--accent);color:var(--bg); }
+    .svc-row .svc-arrow { color:var(--muted);transition:color .3s,transform .3s; }
+    .svc-row:hover .svc-arrow { color:var(--accent);transform:translateX(6px); }
+
+    /* Process */
+    .proc-step { position:relative;padding-left:72px; }
+    .proc-step .proc-num { position:absolute;left:0;top:0;width:48px;height:48px;border-radius:50%;border:2px solid var(--border);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:.9rem;color:var(--muted);transition:all .4s; }
+    .proc-step:hover .proc-num { border-color:var(--accent);color:var(--accent);background:var(--accent-glow); }
+    .proc-line { position:absolute;left:23px;top:56px;bottom:-32px;width:2px;background:linear-gradient(to bottom,var(--border),transparent); }
+
+    /* Case study cards */
+    .case-card { border-radius:20px;overflow:hidden;background:var(--card);border:1px solid var(--border);transition:transform .5s,box-shadow .5s; }
+    .case-card:hover { transform:translateY(-8px);box-shadow:0 30px 60px rgba(0,0,0,0.3); }
+    .case-card .case-img { height:260px;overflow:hidden;position:relative; }
+    .case-card .case-img img { width:100%;height:100%;object-fit:cover;transition:transform .6s; }
+    .case-card:hover .case-img img { transform:scale(1.06); }
+    .case-tag { display:inline-block;padding:4px 12px;border-radius:20px;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.08em; }
+
+    /* Testimonial */
+    .testi { background:var(--card);border:1px solid var(--border);border-radius:20px;padding:36px;transition:border-color .3s; }
+    .testi:hover { border-color:rgba(0,212,170,0.3); }
+
+    /* Pricing */
+    .price-card { background:var(--card);border:1px solid var(--border);border-radius:24px;padding:40px 32px;transition:all .4s;position:relative;overflow:hidden; }
+    .price-card.featured { border-color:var(--accent);box-shadow:0 0 60px rgba(0,212,170,0.08); }
+    .price-card.featured::before { content:'Most Popular';position:absolute;top:20px;right:-32px;background:var(--accent);color:var(--bg);font-size:.7rem;font-weight:700;padding:6px 40px;transform:rotate(45deg);letter-spacing:.06em; }
+    .price-card:hover { transform:translateY(-6px); }
+    .price-check { color:var(--accent);margin-right:10px;font-size:.8rem; }
+    .price-x { color:var(--muted);margin-right:10px;font-size:.8rem;opacity:.4; }
+
+    /* FAQ */
+    .faq-item { border-bottom:1px solid var(--border);overflow:hidden; }
+    .faq-q { display:flex;justify-content:space-between;align-items:center;padding:24px 0;cursor:pointer;transition:color .3s; }
+    .faq-q:hover { color:var(--accent); }
+    .faq-q i { transition:transform .3s;color:var(--muted); }
+    .faq-item.open .faq-q i { transform:rotate(45deg);color:var(--accent); }
+    .faq-a { max-height:0;overflow:hidden;transition:max-height .5s cubic-bezier(.16,1,.3,1),padding .3s; }
+    .faq-item.open .faq-a { max-height:300px;padding-bottom:24px; }
+
+    /* CTA */
+    .cta-main { display:inline-flex;align-items:center;gap:10px;padding:16px 36px;background:var(--accent);color:var(--bg);font-weight:700;border-radius:60px;border:none;cursor:pointer;font-size:.95rem;transition:transform .3s,box-shadow .3s;font-family:'DM Sans',sans-serif; }
+    .cta-main:hover { transform:scale(1.04);box-shadow:0 12px 40px rgba(0,212,170,0.3); }
+    .cta-ghost { display:inline-flex;align-items:center;gap:10px;padding:15px 32px;background:transparent;color:var(--fg);font-weight:600;border-radius:60px;border:1.5px solid var(--border);cursor:pointer;font-size:.95rem;transition:all .3s;font-family:'DM Sans',sans-serif; }
+    .cta-ghost:hover { border-color:var(--fg);background:rgba(255,255,255,0.03); }
+
+    /* Footer links */
+    .fl { color:var(--muted);text-decoration:none;font-size:.88rem;transition:color .25s;display:block;padding:4px 0; }
+    .fl:hover { color:var(--fg); }
+
+    /* Toast */
+    .toast { position:fixed;bottom:30px;right:30px;background:var(--card);border:1px solid var(--accent);color:var(--fg);padding:16px 28px;border-radius:14px;z-index:10000;transform:translateY(100px);opacity:0;transition:all .5s cubic-bezier(.16,1,.3,1);display:flex;align-items:center;gap:10px;font-size:.9rem; }
+    .toast.show { transform:translateY(0);opacity:1; }
+
+    /* Mobile menu */
+    .mob-menu { position:fixed;inset:0;background:rgba(8,11,16,.97);backdrop-filter:blur(30px);z-index:99;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;opacity:0;pointer-events:none;transition:opacity .4s; }
+    .mob-menu.open { opacity:1;pointer-events:all; }
+    .mob-menu a { font-family:'Playfair Display',serif;font-size:1.8rem;font-weight:700;color:var(--fg);text-decoration:none;transition:color .3s; }
+    .mob-menu a:hover { color:var(--accent); }
+
+    /* Section divider */
+    .sdiv { height:1px;background:linear-gradient(to right,transparent,var(--border),transparent); }
+
+    @media(prefers-reduced-motion:reduce){ *,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important;} }
+    @media(max-width:768px){
+      .float-badge{display:none!important;}
+      .svc-row{grid-template-columns:48px 1fr;}.svc-row .svc-arrow{display:none;}
+      .metric-num{font-size:2rem;}
+      .case-card .case-img{height:180px;}
+    }
+  </style>
+</head>
+<body>
+
+<div class="grain" aria-hidden="true"></div>
+<div class="cur-dot" aria-hidden="true"></div>
+<div class="cur-ring" aria-hidden="true"></div>
+
+<!-- Mobile Menu -->
+<div class="mob-menu" id="mobMenu" role="dialog" aria-label="Mobile navigation">
+  <a href="#results" onclick="closeMob()">Results</a>
+  <a href="#services" onclick="closeMob()">Services</a>
+  <a href="#process" onclick="closeMob()">Process</a>
+  <a href="#cases" onclick="closeMob()">Case Studies</a>
+  <a href="#pricing" onclick="closeMob()">Pricing</a>
+  <a href="#faq" onclick="closeMob()">FAQ</a>
+  <a href="#contact" onclick="closeMob()">Contact</a>
+</div>
+
+<!-- Nav -->
+<nav id="nav">
+  <div class="max-w-7xl mx-auto px-6 flex items-center justify-between">
+    <a href="#" style="text-decoration:none;"><span class="display text-xl font-bold" style="color:var(--fg);">Catalyst<span style="color:var(--accent);">.</span></span></a>
+    <div class="hidden lg:flex items-center gap-8">
+      <a href="#results" class="fl" style="display:inline;padding:0;">Results</a>
+      <a href="#services" class="fl" style="display:inline;padding:0;">Services</a>
+      <a href="#cases" class="fl" style="display:inline;padding:0;">Case Studies</a>
+      <a href="#pricing" class="fl" style="display:inline;padding:0;">Pricing</a>
+      <a href="#faq" class="fl" style="display:inline;padding:0;">FAQ</a>
+      <button class="cta-main" style="padding:10px 24px;font-size:.82rem;" onclick="document.getElementById('contact').scrollIntoView({behavior:'smooth'})">Free Audit</button>
+    </div>
+    <button class="lg:hidden text-2xl" onclick="toggleMob()" aria-label="Menu" style="background:none;border:none;color:var(--fg);cursor:pointer;">
+      <i class="fa-solid fa-bars" id="mobIco"></i>
+    </button>
+  </div>
+</nav>
+
+<!-- ===== HERO ===== -->
+<header class="relative min-h-screen flex items-center pt-24 pb-16" style="overflow:hidden;">
+  <div class="hero-grid" aria-hidden="true"></div>
+  <div class="hero-glow g1" aria-hidden="true"></div>
+  <div class="hero-glow g2" aria-hidden="true"></div>
+  <canvas id="hCanvas" style="position:absolute;inset:0;z-index:1;pointer-events:none;" aria-hidden="true"></canvas>
+
+  <!-- Floating badges -->
+  <div class="float-badge" style="top:22%;left:6%;animation-delay:-1s;z-index:5;">
+    <span style="color:var(--accent);font-size:1.1rem;"><i class="fa-solid fa-arrow-trend-up"></i></span>
+    <span>ROI <strong style="color:var(--accent);">+340%</strong></span>
+  </div>
+  <div class="float-badge" style="top:35%;right:5%;animation-delay:-3s;z-index:5;">
+    <span style="color:var(--gold);font-size:1.1rem;"><i class="fa-solid fa-star"></i></span>
+    <span>4.9/5 Client Rating</span>
+  </div>
+  <div class="float-badge" style="bottom:25%;left:10%;animation-delay:-5s;z-index:5;">
+    <span style="color:var(--hot);font-size:1.1rem;"><i class="fa-solid fa-bolt"></i></span>
+    <span>Results in <strong style="color:var(--hot);">30 Days</strong></span>
+  </div>
+
+  <div class="relative z-10 max-w-5xl mx-auto px-6 text-center">
+    <div class="rv mb-5">
+      <span style="display:inline-flex;align-items:center;gap:8px;padding:8px 20px;border-radius:40px;font-size:.75rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;background:var(--accent-glow);color:var(--accent);border:1px solid rgba(0,212,170,0.2);">
+        <span style="width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulse 2s infinite;"></span>
+        Now Accepting Q1 Clients
+      </span>
+    </div>
+    <h1 class="rv rv-d1 display" style="font-size:clamp(2.6rem,7.5vw,5.8rem);font-weight:800;line-height:.97;letter-spacing:-.02em;">
+      Stop guessing.<br/>
+      <span style="background:linear-gradient(135deg,var(--accent),#00f5c8);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;">Start scaling.</span>
+    </h1>
+    <p class="rv rv-d2 mt-7 text-lg md:text-xl max-w-2xl mx-auto" style="color:var(--fg2);line-height:1.75;">
+      We build data-driven marketing systems that turn ad spend into predictable revenue. No vanity metrics — just growth you can bank on.
+    </p>
+    <div class="rv rv-d3 mt-10 flex flex-wrap items-center justify-center gap-4">
+      <button class="cta-main" onclick="document.getElementById('contact').scrollIntoView({behavior:'smooth'})">
+        Get Your Free Audit <i class="fa-solid fa-arrow-right"></i>
+      </button>
+      <button class="cta-ghost" onclick="document.getElementById('cases').scrollIntoView({behavior:'smooth'})">
+        <i class="fa-solid fa-play" style="font-size:.7rem;"></i> See Case Studies
+      </button>
+    </div>
+    <div class="rv rv-d4 mt-14 flex flex-wrap items-center justify-center gap-8">
+      <span class="text-xs font-medium tracking-wider uppercase" style="color:var(--muted);">Trusted by</span>
+      <div class="flex items-center gap-7" style="color:var(--muted);opacity:.5;">
+        <i class="fa-brands fa-shopify text-2xl"></i>
+        <i class="fa-brands fa-hubspot text-2xl"></i>
+        <i class="fa-brands fa-stripe text-2xl"></i>
+        <i class="fa-brands fa-google text-2xl"></i>
+        <i class="fa-brands fa-slack text-2xl"></i>
+      </div>
+    </div>
+  </div>
+  <div class="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-2" style="color:var(--muted);">
+    <span class="text-xs tracking-widest uppercase">Scroll</span>
+    <div style="width:1px;height:36px;background:linear-gradient(to bottom,var(--muted),transparent);animation:sp 2s ease-in-out infinite;"></div>
+  </div>
+</header>
+<style>
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+  @keyframes sp{0%,100%{opacity:.3;transform:scaleY(1)}50%{opacity:1;transform:scaleY(1.3)}}
+</style>
+
+<!-- ===== MARQUEE ===== -->
+<section style="padding:20px 0;background:var(--bg2);border-top:1px solid var(--border);border-bottom:1px solid var(--border);overflow:hidden;">
+  <div class="mtrack" aria-hidden="true">
+    <span class="display text-2xl font-bold mx-8" style="color:var(--muted);white-space:nowrap;">PPC</span>
+    <span style="color:var(--accent);">&#9670;</span>
+    <span class="display text-2xl font-bold mx-8" style="color:var(--muted);white-space:nowrap;">SEO</span>
+    <span style="color:var(--accent);">&#9670;</span>
+    <span class="display text-2xl font-bold mx-8" style="color:var(--muted);white-space:nowrap;">Social Media</span>
+    <span style="color:var(--accent);">&#9670;</span>
+    <span class="display text-2xl font-bold mx-8" style="color:var(--muted);white-space:nowrap;">Email Marketing</span>
+    <span style="color:var(--accent);">&#9670;</span>
+    <span class="display text-2xl font-bold mx-8" style="color:var(--muted);white-space:nowrap;">CRO</span>
+    <span style="color:var(--accent);">&#9670;</span>
+    <span class="display text-2xl font-bold mx-8" style="color:var(--muted);white-space:nowrap;">Analytics</span>
+    <span style="color:var(--accent);">&#9670;</span>
+    <span class="display text-2xl font-bold mx-8" style="color:var(--muted);white-space:nowrap;">Content Strategy</span>
+    <span style="color:var(--accent);">&#9670;</span>
+    <span class="display text-2xl font-bold mx-8" style="color:var(--muted);white-space:nowrap;">PPC</span>
+    <span style="color:var(--accent);">&#9670;</span>
+    <span class="display text-2xl font-bold mx-8" style="color:var(--muted);white-space:nowrap;">SEO</span>
+    <span style="color:var(--accent);">&#9670;</span>
+    <span class="display text-2xl font-bold mx-8" style="color:var(--muted);white-space:nowrap;">Social Media</span>
+    <span style="color:var(--accent);">&#9670;</span>
+    <span class="display text-2xl font-bold mx-8" style="color:var(--muted);white-space:nowrap;">Email Marketing</span>
+    <span style="color:var(--accent);">&#9670;</span>
+    <span class="display text-2xl font-bold mx-8" style="color:var(--muted);white-space:nowrap;">CRO</span>
+    <span style="color:var(--accent);">&#9670;</span>
+    <span class="display text-2xl font-bold mx-8" style="color:var(--muted);white-space:nowrap;">Analytics</span>
+    <span style="color:var(--accent);">&#9670;</span>
+    <span class="display text-2xl font-bold mx-8" style="color:var(--muted);white-space:nowrap;">Content Strategy</span>
+    <span style="color:var(--accent);">&#9670;</span>
+  </div>
+</section>
+
+<!-- ===== RESULTS / METRICS ===== -->
+<section id="results" class="py-28 px-6">
+  <div class="max-w-7xl mx-auto">
+    <div class="text-center mb-16">
+      <span class="rv text-xs tracking-widest uppercase font-semibold" style="color:var(--accent);">Proven Results</span>
+      <h2 class="rv rv-d1 display mt-3" style="font-size:clamp(2rem,5vw,3.5rem);font-weight:800;">Numbers that matter</h2>
+      <p class="rv rv-d2 mt-4 max-w-xl mx-auto" style="color:var(--muted);line-height:1.75;">We measure success the same way you do — by revenue, not impressions.</p>
+    </div>
+    <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div class="metric-card rv">
+        <div class="mc-icon" style="background:rgba(0,212,170,0.1);color:var(--accent);"><i class="fa-solid fa-dollar-sign"></i></div>
+        <div class="metric-num" style="color:var(--accent);" data-target="47" data-suffix="M+">0</div>
+        <p class="mt-2 text-sm font-medium" style="color:var(--fg2);">Revenue Generated</p>
+        <p class="mt-1 text-xs" style="color:var(--muted);">For clients in the last 3 years</p>
+      </div>
+      <div class="metric-card rv rv-d1">
+        <div class="mc-icon" style="background:rgba(255,107,74,0.1);color:var(--hot);"><i class="fa-solid fa-chart-line"></i></div>
+        <div class="metric-num" style="color:var(--hot);" data-target="340" data-suffix="%">0</div>
+        <p class="mt-2 text-sm font-medium" style="color:var(--fg2);">Average ROI Increase</p>
+        <p class="mt-1 text-xs" style="color:var(--muted);">Across all paid channels</p>
+      </div>
+      <div class="metric-card rv rv-d2">
+        <div class="mc-icon" style="background:rgba(245,197,66,0.1);color:var(--gold);"><i class="fa-solid fa-users"></i></div>
+        <div class="metric-num" style="color:var(--gold);" data-target="520" data-suffix="K">0</div>
+        <p class="mt-2 text-sm font-medium" style="color:var(--fg2);">Leads Delivered</p>
+        <p class="mt-1 text-xs" style="color:var(--muted);">Qualified leads, not junk</p>
+      </div>
+      <div class="metric-card rv rv-d3">
+        <div class="mc-icon" style="background:rgba(0,212,170,0.1);color:var(--accent);"><i class="fa-solid fa-bullseye"></i></div>
+        <div class="metric-num" style="color:var(--accent);" data-target="92" data-suffix="%">0</div>
+        <p class="mt-2 text-sm font-medium" style="color:var(--fg2);">Client Retention Rate</p>
+        <p class="mt-1 text-xs" style="color:var(--muted);">Because results keep coming</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="sdiv max-w-7xl mx-auto"></div>
+
+<!-- ===== SERVICES ===== -->
+<section id="services" class="py-28 px-6">
+  <div class="max-w-7xl mx-auto grid lg:grid-cols-2 gap-20">
+    <div>
+      <span class="rv text-xs tracking-widest uppercase font-semibold" style="color:var(--accent);">Our Services</span>
+      <h2 class="rv rv-d1 display mt-3" style="font-size:clamp(2rem,4.5vw,3.2rem);font-weight:800;line-height:1.08;">Full-stack marketing, zero fluff</h2>
+      <p class="rv rv-d2 mt-6" style="color:var(--muted);line-height:1.85;max-width:480px;">Every service is designed around one principle: measurable impact. We don't sell hours — we sell outcomes.</p>
+      <div class="rv rv-d3 mt-8">
+        <button class="cta-ghost" onclick="document.getElementById('contact').scrollIntoView({behavior:'smooth'})">Discuss Your Strategy <i class="fa-solid fa-arrow-right text-xs"></i></button>
+      </div>
+    </div>
+    <div class="flex flex-col gap-5">
+      <div class="svc-row rv">
+        <div class="svc-ico"><i class="fa-solid fa-magnifying-glass-chart"></i></div>
+        <div>
+          <h3 class="font-bold text-lg">Search Engine Optimization</h3>
+          <p class="mt-1 text-sm" style="color:var(--muted);line-height:1.7;">Technical audits, content strategy, and link building that ranks you where your customers are searching.</p>
+        </div>
+        <i class="fa-solid fa-arrow-right svc-arrow"></i>
+      </div>
+      <div class="svc-row rv rv-d1">
+        <div class="svc-ico"><i class="fa-solid fa-rectangle-ad"></i></div>
+        <div>
+          <h3 class="font-bold text-lg">Paid Advertising (PPC)</h3>
+          <p class="mt-1 text-sm" style="color:var(--muted);line-height:1.7;">Google Ads, Meta Ads, LinkedIn — managed with surgical precision to maximize ROAS at every stage.</p>
+        </div>
+        <i class="fa-solid fa-arrow-right svc-arrow"></i>
+      </div>
+      <div class="svc-row rv rv-d2">
+        <div class="svc-ico"><i class="fa-solid fa-share-nodes"></i></div>
+        <div>
+          <h3 class="font-bold text-lg">Social Media Marketing</h3>
+          <p class="mt-1 text-sm" style="color:var(--muted);line-height:1.7;">Organic growth and community building that creates brand advocates, not just followers.</p>
+        </div>
+        <i class="fa-solid fa-arrow-right svc-arrow"></i>
+      </div>
+      <div class="svc-row rv rv-d3">
+        <div class="svc-ico"><i class="fa-solid fa-envelope-open-text"></i></div>
+        <div>
+          <h3 class="font-bold text-lg">Email & Automation</h3>
+          <p class="mt-1 text-sm" style="color:var(--muted);line-height:1.7;">Sequences, nurture flows, and segmentation that convert cold leads into paying customers.</p>
+        </div>
+        <i class="fa-solid fa-arrow-right svc-arrow"></i>
+      </div>
+      <div class="svc-row rv rv-d4">
+        <div class="svc-ico"><i class="fa-solid fa-flask"></i></div>
+        <div>
+          <h3 class="font-bold text-lg">Conversion Rate Optimization</h3>
+          <p class="mt-1 text-sm" style="color:var(--muted);line-height:1.7;">A/B testing, landing page optimization, and UX analysis to squeeze more revenue from existing traffic.</p>
+        </div>
+        <i class="fa-solid fa-arrow-right svc-arrow"></i>
+      </div>
+      <div class="svc-row rv rv-d5">
+        <div class="svc-ico"><i class="fa-solid fa-chart-pie"></i></div>
+        <div>
+          <h3 class="font-bold text-lg">Analytics & Reporting</h3>
+          <p class="mt-1 text-sm" style="color:var(--muted);line-height:1.7;">Custom dashboards, attribution modeling, and weekly insights so you always know what's working.</p>
+        </div>
+        <i class="fa-solid fa-arrow-right svc-arrow"></i>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="sdiv max-w-7xl mx-auto"></div>
+
+<!-- ===== PROCESS ===== -->
+<section id="process" class="py-28 px-6" style="background:var(--bg2);">
+  <div class="max-w-7xl mx-auto grid lg:grid-cols-2 gap-20">
+    <div>
+      <span class="rv text-xs tracking-widest uppercase font-semibold" style="color:var(--accent);">How It Works</span>
+      <h2 class="rv rv-d1 display mt-3" style="font-size:clamp(2rem,4.5vw,3.2rem);font-weight:800;line-height:1.08;">From audit to scale<br/>in four steps</h2>
+      <p class="rv rv-d2 mt-6" style="color:var(--muted);line-height:1.85;max-width:460px;">No black boxes. You'll see exactly how we work, what we measure, and why every decision gets made.</p>
+    </div>
+    <div class="flex flex-col gap-10">
+      <div class="proc-step rv">
+        <div class="proc-num">01</div>
+        <div class="proc-line"></div>
+        <h3 class="font-bold text-lg">Deep-Dive Audit</h3>
+        <p class="mt-2 text-sm" style="color:var(--muted);line-height:1.75;">We analyze your current channels, competitors, and customer journey to find the highest-leverage opportunities. This is free.</p>
+      </div>
+      <div class="proc-step rv rv-d1">
+        <div class="proc-num">02</div>
+        <div class="proc-line"></div>
+        <h3 class="font-bold text-lg">Strategy Blueprint</h3>
+        <p class="mt-2 text-sm" style="color:var(--muted);line-height:1.75;">Custom roadmap with channel priorities, budget allocation, KPIs, and projected ROI. You approve before we spend a dollar.</p>
+      </div>
+      <div class="proc-step rv rv-d2">
+        <div class="proc-num">03</div>
+        <div class="proc-line"></div>
+        <h3 class="font-bold text-lg">Launch & Optimize</h3>
+        <p class="mt-2 text-sm" style="color:var(--muted);line-height:1.75;">Campaigns go live. We test aggressively in week one, kill losers fast, and double down on winners by week two.</p>
+      </div>
+      <div class="proc-step rv rv-d3">
+        <div class="proc-num">04</div>
+        <h3 class="font-bold text-lg">Scale & Compound</h3>
+        <p class="mt-2 text-sm" style="color:var(--muted);line-height:1.75;">Once unit economics are proven, we scale spend intelligently while expanding into new channels and audiences.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CASE STUDIES ===== -->
+<section id="cases" class="py-28 px-6">
+  <div class="max-w-7xl mx-auto">
+    <div class="text-center mb-16">
+      <span class="rv text-xs tracking-widest uppercase font-semibold" style="color:var(--accent);">Case Studies</span>
+      <h2 class="rv rv-d1 display mt-3" style="font-size:clamp(2rem,5vw,3.5rem);font-weight:800;">Real clients. Real growth.</h2>
+    </div>
+    <div class="grid md:grid-cols-3 gap-8">
+      <div class="case-card rv">
+        <div class="case-img">
+          <img src="https://picsum.photos/seed/cat-ecom/600/400.jpg" alt="E-commerce case study" loading="lazy" />
+        </div>
+        <div class="p-7">
+          <span class="case-tag" style="background:rgba(0,212,170,0.12);color:var(--accent);">E-Commerce</span>
+          <h3 class="display font-bold text-xl mt-4">StyleVault</h3>
+          <p class="mt-2 text-sm" style="color:var(--muted);line-height:1.7;">Scaled a DTC fashion brand from $120K to $890K monthly revenue in 6 months through Google Shopping and Meta ads.</p>
+          <div class="flex items-center gap-6 mt-5">
+            <div><span class="font-bold text-lg" style="color:var(--accent);">642%</span><br/><span class="text-xs" style="color:var(--muted);">ROAS</span></div>
+            <div><span class="font-bold text-lg" style="color:var(--hot);">-48%</span><br/><span class="text-xs" style="color:var(--muted);">CPA Reduction</span></div>
+            <div><span class="font-bold text-lg" style="color:var(--gold);">3.2x</span><br/><span class="text-xs" style="color:var(--muted);">Revenue</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="case-card rv rv-d1">
+        <div class="case-img">
+          <img src="https://picsum.photos/seed/cat-saas/600/400.jpg" alt="SaaS case study" loading="lazy" />
+        </div>
+        <div class="p-7">
+          <span class="case-tag" style="background:rgba(255,107,74,0.12);color:var(--hot);">SaaS</span>
+          <h3 class="display font-bold text-xl mt-4">CloudPipe</h3>
+          <p class="mt-2 text-sm" style="color:var(--muted);line-height:1.7;">Built a demand gen engine that cut CAC by 60% while tripling demo bookings through LinkedIn and content SEO.</p>
+          <div class="flex items-center gap-6 mt-5">
+            <div><span class="font-bold text-lg" style="color:var(--accent);">-60%</span><br/><span class="text-xs" style="color:var(--muted);">CAC</span></div>
+            <div><span class="font-bold text-lg" style="color:var(--hot);">3x</span><br/><span class="text-xs" style="color:var(--muted);">Demo Volume</span></div>
+            <div><span class="font-bold text-lg" style="color:var(--gold);">28%</span><br/><span class="text-xs" style="color:var(--muted);">Conv. Rate</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="case-card rv rv-d2">
+        <div class="case-img">
+          <img src="https://picsum.photos/seed/cat-local/600/400.jpg" alt="Local business case study" loading="lazy" />
+        </div>
+        <div class="p-7">
+          <span class="case-tag" style="background:rgba(245,197,66,0.12);color:var(--gold);">Local Business</span>
+          <h3 class="display font-bold text-xl mt-4">MedSpa Elite</h3>
+          <p class="mt-2 text-sm" style="color:var(--muted);line-height:1.7;">Generated 2,400+ qualified bookings in 90 days using local SEO, Google Ads, and reputation management.</p>
+          <div class="flex items-center gap-6 mt-5">
+            <div><span class="font-bold text-lg" style="color:var(--accent);">2.4K</span><br/><span class="text-xs" style="color:var(--muted);">Bookings</span></div>
+            <div><span class="font-bold text-lg" style="color:var(--hot);">#1</span><br/><span class="text-xs" style="color:var(--muted);">Local Rank</span></div>
+            <div><span class="font-bold text-lg" style="color:var(--gold);">512%</span><br/><span class="text-xs" style="color:var(--muted);">ROI</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="sdiv max-w-7xl mx-auto"></div>
+
+<!-- ===== TESTIMONIALS ===== -->
+<section id="testimonials" class="py-28 px-6" style="background:var(--bg2);">
+  <div class="max-w-7xl mx-auto">
+    <div class="text-center mb-16">
+      <span class="rv text-xs tracking-widest uppercase font-semibold" style="color:var(--accent);">Client Voices</span>
+      <h2 class="rv rv-d1 display mt-3" style="font-size:clamp(2rem,5vw,3.5rem);font-weight:800;">Don't take our word for it</h2>
+    </div>
+    <div class="grid md:grid-cols-3 gap-8">
+      <div class="testi rv">
+        <div class="flex gap-1 mb-4" style="color:var(--gold);"><i class="fa-solid fa-star text-sm"></i><i class="fa-solid fa-star text-sm"></i><i class="fa-solid fa-star text-sm"></i><i class="fa-solid fa-star text-sm"></i><i class="fa-solid fa-star text-sm"></i></div>
+        <p class="text-sm" style="color:var(--fg2);line-height:1.85;">"Catalyst didn't just run our ads — they rebuilt our entire funnel. Revenue went from $120K to nearly $900K a month. I've worked with 5 agencies before. None came close."</p>
+        <div class="flex items-center gap-3 mt-6">
+          <img src="https://picsum.photos/seed/cat-cl1/80/80.jpg" class="w-11 h-11 rounded-full" alt="Jason Park" />
+          <div><p class="text-sm font-semibold">Jason Park</p><p class="text-xs" style="color:var(--muted);">CEO, StyleVault</p></div>
+        </div>
+      </div>
+      <div class="testi rv rv-d1">
+        <div class="flex gap-1 mb-4" style="color:var(--gold);"><i class="fa-solid fa-star text-sm"></i><i class="fa-solid fa-star text-sm"></i><i class="fa-solid fa-star text-sm"></i><i class="fa-solid fa-star text-sm"></i><i class="fa-solid fa-star text-sm"></i></div>
+        <p class="text-sm" style="color:var(--fg2);line-height:1.85;">"Our CAC was killing us. Catalyst came in, diagnosed the problem in 48 hours, and had a new strategy running by week two. Demo bookings tripled in 60 days."</p>
+        <div class="flex items-center gap-3 mt-6">
+          <img src="https://picsum.photos/seed/cat-cl2/80/80.jpg" class="w-11 h-11 rounded-full" alt="Priya Sharma" />
+          <div><p class="text-sm font-semibold">Priya Sharma</p><p class="text-xs" style="color:var(--muted);">VP Marketing, CloudPipe</p></div>
+        </div>
+      </div>
+      <div class="testi rv rv-d2">
+        <div class="flex gap-1 mb-4" style="color:var(--gold);"><i class="fa-solid fa-star text-sm"></i><i class="fa-solid fa-star text-sm"></i><i class="fa-solid fa-star text-sm"></i><i class="fa-solid fa-star text-sm"></i><i class="fa-solid fa-star text-sm"></i></div>
+        <p class="text-sm" style="color:var(--fg2);line-height:1.85;">"We were invisible on Google. Now we're ranked #1 for every keyword that matters. 2,400 bookings in 90 days. Our biggest mistake was not hiring them sooner."</p>
+        <div class="flex items-center gap-3 mt-6">
+          <img src="https://picsum.photos/seed/cat-cl3/80/80.jpg" class="w-11 h-11 rounded-full" alt="Dr. Lisa Chen" />
+          <div><p class="text-sm font-semibold">Dr. Lisa Chen</p><p class="text-xs" style="color:var(--muted);">Owner, MedSpa Elite</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== PRICING ===== -->
+<section id="pricing" class="py-28 px-6">
+  <div class="max-w-7xl mx-auto">
+    <div class="text-center mb-16">
+      <span class="rv text-xs tracking-widest uppercase font-semibold" style="color:var(--accent);">Pricing</span>
+      <h2 class="rv rv-d1 display mt-3" style="font-size:clamp(2rem,5vw,3.5rem);font-weight:800;">Transparent pricing, no surprises</h2>
+      <p class="rv rv-d2 mt-4 max-w-xl mx-auto" style="color:var(--muted);">Every plan includes a dedicated strategist, weekly reporting, and full transparency. Cancel anytime.</p>
+    </div>
+    <div class="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+      <!-- Starter -->
+      <div class="price-card rv">
+        <p class="text-xs tracking-widest uppercase font-semibold" style="color:var(--muted);">Starter</p>
+        <div class="mt-4 flex items-end gap-1"><span class="display text-4xl font-bold">$2,500</span><span class="text-sm mb-1" style="color:var(--muted);">/mo</span></div>
+        <p class="mt-3 text-sm" style="color:var(--muted);">For businesses starting their paid acquisition journey.</p>
+        <hr style="border:none;border-top:1px solid var(--border);margin:24px 0;" />
+        <div class="flex flex-col gap-3 text-sm" style="color:var(--fg2);">
+          <p><i class="fa-solid fa-check price-check"></i>2 ad platforms managed</p>
+          <p><i class="fa-solid fa-check price-check"></i>Up to $15K monthly ad spend</p>
+          <p><i class="fa-solid fa-check price-check"></i>Weekly performance reports</p>
+          <p><i class="fa-solid fa-check price-check"></i>Landing page recommendations</p>
+          <p><i class="fa-solid fa-check price-check"></i>Dedicated strategist</p>
+          <p><i class="fa-solid fa-xmark price-x"></i>SEO & content</p>
+          <p><i class="fa-solid fa-xmark price-x"></i>Email automation</p>
+        </div>
+        <button class="cta-ghost w-full justify-center mt-8" onclick="document.getElementById('contact').scrollIntoView({behavior:'smooth'})">Get Started</button>
+      </div>
+      <!-- Growth (Featured) -->
+      <div class="price-card featured rv rv-d1">
+        <p class="text-xs tracking-widest uppercase font-semibold" style="color:var(--accent);">Growth</p>
+        <div class="mt-4 flex items-end gap-1"><span class="display text-4xl font-bold">$5,500</span><span class="text-sm mb-1" style="color:var(--muted);">/mo</span></div>
+        <p class="mt-3 text-sm" style="color:var(--muted);">For companies ready to aggressively scale their marketing.</p>
+        <hr style="border:none;border-top:1px solid var(--border);margin:24px 0;" />
+        <div class="flex flex-col gap-3 text-sm" style="color:var(--fg2);">
+          <p><i class="fa-solid fa-check price-check"></i>4 ad platforms managed</p>
+          <p><i class="fa-solid fa-check price-check"></i>Up to $75K monthly ad spend</p>
+          <p><i class="fa-solid fa-check price-check"></i>Custom dashboard + daily data</p>
+          <p><i class="fa-solid fa-check price-check"></i>Landing page build & testing</p>
+          <p><i class="fa-solid fa-check price-check"></i>SEO audit & content strategy</p>
+          <p><i class="fa-solid fa-check price-check"></i>Email sequence build</p>
+          <p><i class="fa-solid fa-check price-check"></i>Bi-weekly strategy calls</p>
+        </div>
+        <button class="cta-main w-full justify-center mt-8" onclick="document.getElementById('contact').scrollIntoView({behavior:'smooth'})">Get Started</button>
+      </div>
+      <!-- Enterprise -->
+      <div class="price-card rv rv-d2">
+        <p class="text-xs tracking-widest uppercase font-semibold" style="color:var(--muted);">Enterprise</p>
+        <div class="mt-4 flex items-end gap-1"><span class="display text-4xl font-bold">Custom</span></div>
+        <p class="mt-3 text-sm" style="color:var(--muted);">For high-growth brands needing a full outsourced marketing team.</p>
+        <hr style="border:none;border-top:1px solid var(--border);margin:24px 0;" />
+        <div class="flex flex-col gap-3 text-sm" style="color:var(--fg2);">
+          <p><i class="fa-solid fa-check price-check"></i>Unlimited platforms</p>
+          <p><i class="fa-solid fa-check price-check"></i>Unlimited ad spend management</p>
+          <p><i class="fa-solid fa-check price-check"></i>Full creative team included</p>
+          <p><i class="fa-solid fa-check price-check"></i>CRO & A/B testing program</p>
+          <p><i class="fa-solid fa-check price-check"></i>Full SEO & content engine</p>
+          <p><i class="fa-solid fa-check price-check"></i>Marketing automation stack</p>
+          <p><i class="fa-solid fa-check price-check"></i>Dedicated account director</p>
+        </div>
+        <button class="cta-ghost w-full justify-center mt-8" onclick="document.getElementById('contact').scrollIntoView({behavior:'smooth'})">Contact Sales</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<div class="sdiv max-w-7xl mx-auto"></div>
+
+<!-- ===== FAQ ===== -->
+<section id="faq" class="py-28 px-6" style="background:var(--bg2);">
+  <div class="max-w-3xl mx-auto">
+    <div class="text-center mb-16">
+      <span class="rv text-xs tracking-widest uppercase font-semibold" style="color:var(--accent);">FAQ</span>
+      <h2 class="rv rv-d1 display mt-3" style="font-size:clamp(2rem,5vw,3rem);font-weight:800;">Common questions</h2>
+    </div>
+    <div class="rv">
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span class="font-semibold">How quickly will I see results?</span>
+          <i class="fa-solid fa-plus"></i>
+        </div>
+        <div class="faq-a text-sm" style="color:var(--muted);line-height:1.8;">
+          Paid channels typically show measurable improvement within 2-3 weeks. SEO is a longer play — expect meaningful movement in 3-6 months. We set clear milestones upfront so there are no surprises.
+        </div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span class="font-semibold">Do you require long-term contracts?</span>
+          <i class="fa-solid fa-plus"></i>
+        </div>
+        <div class="faq-a text-sm" style="color:var(--muted);line-height:1.8;">
+          No. All plans are month-to-month. We believe in earning your business every 30 days. That said, the best results come from 6+ months of consistent effort — we'll be upfront about that.
+        </div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span class="font-semibold">What's included in the free audit?</span>
+          <i class="fa-solid fa-plus"></i>
+        </div>
+        <div class="faq-a text-sm" style="color:var(--muted);line-height:1.8;">
+          A full-channel review covering your ad accounts, SEO health, website conversion potential, competitive landscape, and a prioritized list of the top 5 opportunities. Typically delivered in 3-5 business days.
+        </div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span class="font-semibold">Do you handle creative/design too?</span>
+          <i class="fa-solid fa-plus"></i>
+        </div>
+        <div class="faq-a text-sm" style="color:var(--muted);line-height:1.8;">
+          Growth and Enterprise plans include ad creative, landing page design, and basic brand assets. For full brand identity work, we partner with specialist design studios — we'll manage the process end-to-end.
+        </div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span class="font-semibold">What industries do you work with?</span>
+          <i class="fa-solid fa-plus"></i>
+        </div>
+        <div class="faq-a text-sm" style="color:var(--muted);line-height:1.8;">
+          We specialize in e-commerce, SaaS, healthcare, and professional services — but our framework is channel-agnostic. If you sell something online, we can probably help. Let's talk and find out.
+        </div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q" onclick="toggleFaq(this)">
+          <span class="font-semibold">How is reporting handled?</span>
+          <i class="fa-solid fa-plus"></i>
+        </div>
+        <div class="faq-a text-sm" style="color:var(--muted);line-height:1.8;">
+          You get a real-time custom dashboard (not just screenshots), plus a weekly narrative report explaining what happened, why, and what we're doing next. Growth+ plans include a live bi-weekly strategy call.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===== CONTACT / CTA ===== -->
+<section id="contact" class="py-28 px-6 relative overflow-hidden">
+  <div class="absolute inset-0" style="background:radial-gradient(ellipse at center,rgba(0,212,170,0.06),transparent 65%);"></div>
+  <div class="max-w-3xl mx-auto text-center relative z-10">
+    <span class="rv text-xs tracking-widest uppercase font-semibold" style="color:var(--accent);">Get Started</span>
+    <h2 class="rv rv-d1 display mt-3" style="font-size:clamp(2rem,6vw,3.8rem);font-weight:800;line-height:1.05;">
+      Your free audit is<br/>one step away
+    </h2>
+    <p class="rv rv-d2 mt-6 text-lg" style="color:var(--muted);line-height:1.8;">
+      No sales pitch. No pressure. Just a clear breakdown of where your marketing is leaving money on the table — and what to do about it.
+    </p>
+    <form id="cForm" class="rv rv-d3 mt-12 text-left space-y-5" onsubmit="handleSubmit(event)">
+      <div class="grid md:grid-cols-2 gap-5">
+        <div>
+          <label class="block text-xs tracking-widest uppercase mb-2 font-semibold" style="color:var(--muted);">Full Name</label>
+          <input type="text" required placeholder="John Smith" class="w-full px-5 py-4 rounded-xl text-sm outline-none transition-all focus:ring-2" style="background:var(--card);border:1px solid var(--border);color:var(--fg);--tw-ring-color:var(--accent);" />
+        </div>
+        <div>
+          <label class="block text-xs tracking-widest uppercase mb-2 font-semibold" style="color:var(--muted);">Work Email</label>
+          <input type="email" required placeholder="john@company.com" class="w-full px-5 py-4 rounded-xl text-sm outline-none transition-all focus:ring-2" style="background:var(--card);border:1px solid var(--border);color:var(--fg);--tw-ring-color:var(--accent);" />
+        </div>
+      </div>
+      <div class="grid md:grid-cols-2 gap-5">
+        <div>
+          <label class="block text-xs tracking-widest uppercase mb-2 font-semibold" style="color:var(--muted);">Company Website</label>
+          <input type="url" required placeholder="https://yoursite.com" class="w-full px-5 py-4 rounded-xl text-sm outline-none transition-all focus:ring-2" style="background:var(--card);border:1px solid var(--border);color:var(--fg);--tw-ring-color:var(--accent);" />
+        </div>
+        <div>
+          <label class="block text-xs tracking-widest uppercase mb-2 font-semibold" style="color:var(--muted);">Monthly Ad Spend</label>
+          <select required class="w-full px-5 py-4 rounded-xl text-sm outline-none transition-all focus:ring-2 appearance-none" style="background:var(--card);border:1px solid var(--border);color:var(--fg);--tw-ring-color:var(--accent);">
+            <option value="" disabled selected>Select range</option>
+            <option>Under $5,000</option>
+            <option>$5,000 - $15,000</option>
+            <option>$15,000 - $50,000</option>
+            <option>$50,000 - $100,000</option>
+            <option>$100,000+</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label class="block text-xs tracking-widest uppercase mb-2 font-semibold" style="color:var(--muted);">What's your biggest marketing challenge?</label>
+        <textarea required rows="4" placeholder="Tell us what's not working, what you've tried, and what your goals are..." class="w-full px-5 py-4 rounded-xl text-sm outline-none transition-all resize-none focus:ring-2" style="background:var(--card);border:1px solid var(--border);color:var(--fg);--tw-ring-color:var(--accent);"></textarea>
+      </div>
+      <div class="text-center pt-4">
+        <button type="submit" class="cta-main" style="padding:18px 48px;font-size:1rem;">
+          Claim Free Audit <i class="fa-solid fa-arrow-right"></i>
+        </button>
+        <p class="mt-3 text-xs" style="color:var(--muted);">Typically delivered in 3-5 business days. No obligation.</p>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- ===== FOOTER ===== -->
+<footer class="py-16 px-6" style="background:var(--bg2);border-top:1px solid var(--border);">
+  <div class="max-w-7xl mx-auto">
+    <div class="grid md:grid-cols-5 gap-12 mb-16">
+      <div class="md:col-span-2">
+        <span class="display text-2xl font-bold" style="color:var(--fg);">Catalyst<span style="color:var(--accent);">.</span></span>
+        <p class="mt-4 text-sm" style="color:var(--muted);line-height:1.75;max-width:320px;">
+          Performance marketing agency for growth-stage companies. Data-driven, revenue-obsessed, no BS.
+        </p>
+        <div class="flex items-center gap-5 mt-6">
+          <a href="#" class="fl" style="display:inline;padding:0;font-size:1.15rem;" aria-label="Twitter"><i class="fa-brands fa-x-twitter"></i></a>
+          <a href="#" class="fl" style="display:inline;padding:0;font-size:1.15rem;" aria-label="LinkedIn"><i class="fa-brands fa-linkedin-in"></i></a>
+          <a href="#" class="fl" style="display:inline;padding:0;font-size:1.15rem;" aria-label="Instagram"><i class="fa-brands fa-instagram"></i></a>
+          <a href="#" class="fl" style="display:inline;padding:0;font-size:1.15rem;" aria-label="YouTube"><i class="fa-brands fa-youtube"></i></a>
+        </div>
+      </div>
+      <div>
+        <h4 class="text-xs tracking-widest uppercase font-bold mb-5" style="color:var(--fg);">Company</h4>
+        <a href="#results" class="fl">Results</a>
+        <a href="#services" class="fl">Services</a>
+        <a href="#cases" class="fl">Case Studies</a>
+        <a href="#pricing" class="fl">Pricing</a>
+        <a href="#faq" class="fl">FAQ</a>
+      </div>
+      <div>
+        <h4 class="text-xs tracking-widest uppercase font-bold mb-5" style="color:var(--fg);">Services</h4>
+        <span class="fl" style="cursor:default;">SEO</span>
+        <span class="fl" style="cursor:default;">PPC / Paid Ads</span>
+        <span class="fl" style="cursor:default;">Social Media</span>
+        <span class="fl" style="cursor:default;">Email Automation</span>
+        <span class="fl" style="cursor:default;">CRO</span>
+      </div>
+      <div>
+        <h4 class="text-xs tracking-widest uppercase font-bold mb-5" style="color:var(--fg);">Contact</h4>
+        <a href="mailto:hello@catalyst.marketing" class="fl">hello@catalyst.marketing</a>
+        <span class="fl" style="cursor:default;">+1 (555) 234-5678</span>
+        <span class="fl" style="cursor:default;">New York, NY</span>
+        <span class="fl" style="cursor:default;">Austin, TX</span>
+        <span class="fl" style="cursor:default;">London, UK</span>
+      </div>
+    </div>
+    <hr style="border:none;height:1px;background:linear-gradient(to right,var(--accent),transparent);margin-bottom:24px;" />
+    <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+      <p class="text-xs" style="color:var(--muted);">2024 Catalyst Marketing. All rights reserved.</p>
+      <div class="flex items-center gap-6">
+        <a href="#" class="fl" style="display:inline;padding:0;">Privacy Policy</a>
+        <a href="#" class="fl" style="display:inline;padding:0;">Terms of Service</a>
+        <a href="#" class="fl" style="display:inline;padding:0;">Cookie Settings</a>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<!-- Toast -->
+<div class="toast" id="toast">
+  <i class="fa-solid fa-circle-check" style="color:var(--accent);font-size:1.1rem;"></i>
+  <span>Audit request received! We'll be in touch within 24 hours.</span>
+</div>
+
+<script>
+/* ===== Cursor ===== */
+const cDot=document.querySelector('.cur-dot'),cRing=document.querySelector('.cur-ring');
+let mx=0,my=0,rx=0,ry=0;
+document.addEventListener('mousemove',e=>{mx=e.clientX;my=e.clientY;cDot.style.left=mx-3+'px';cDot.style.top=my-3+'px';});
+function aCur(){rx+=(mx-rx)*.14;ry+=(my-ry)*.14;cRing.style.left=rx+'px';cRing.style.top=ry+'px';requestAnimationFrame(aCur);}
+aCur();
+document.querySelectorAll('a,button,input,textarea,select,.svc-row,.case-card,.testi,.price-card,.faq-q').forEach(el=>{
+  el.addEventListener('mouseenter',()=>cRing.classList.add('hov'));
+  el.addEventListener('mouseleave',()=>cRing.classList.remove('hov'));
+});
+
+/* ===== Nav scroll ===== */
+const nav=document.getElementById('nav');
+window.addEventListener('scroll',()=>nav.classList.toggle('scrolled',scrollY>50));
+
+/* ===== Mobile menu ===== */
+const mobM=document.getElementById('mobMenu'),mobI=document.getElementById('mobIco');
+let mobO=false;
+function toggleMob(){mobO=!mobO;mobM.classList.toggle('open',mobO);mobI.className=mobO?'fa-solid fa-xmark':'fa-solid fa-bars';document.body.style.overflow=mobO?'hidden':'';}
+function closeMob(){mobO=false;mobM.classList.remove('open');mobI.className='fa-solid fa-bars';document.body.style.overflow='';}
+
+/* ===== Scroll reveal ===== */
+const rvEls=document.querySelectorAll('.rv');
+const rvObs=new IntersectionObserver(e=>{e.forEach(en=>{if(en.isIntersecting)en.target.classList.add('vis');});},{threshold:.08,rootMargin:'0px 0px -30px 0px'});
+rvEls.forEach(el=>rvObs.observe(el));
+
+/* ===== Stat counters ===== */
+const mNums=document.querySelectorAll('.metric-num');
+let mCounted=false;
+const mObs=new IntersectionObserver(e=>{e.forEach(en=>{
+  if(en.isIntersecting&&!mCounted){
+    mCounted=true;
+    mNums.forEach(el=>{
+      const t=parseInt(el.dataset.target),s=el.dataset.suffix||'';
+      let c=0;const inc=t/55;
+      const timer=setInterval(()=>{c+=inc;if(c>=t){c=t;clearInterval(timer);}el.textContent=Math.floor(c)+s;},22);
+    });
+  }
+});},{threshold:.3});
+mNums.forEach(el=>mObs.observe(el));
+
+/* ===== FAQ toggle ===== */
+function toggleFaq(q){
+  const item=q.parentElement;
+  const wasOpen=item.classList.contains('open');
+  document.querySelectorAll('.faq-item').forEach(i=>i.classList.remove('open'));
+  if(!wasOpen)item.classList.add('open');
+}
+
+/* ===== Hero particle canvas ===== */
+const cv=document.getElementById('hCanvas'),cx=cv.getContext('2d');
+let pts=[];
+function rsCv(){cv.width=cv.parentElement.offsetWidth;cv.height=cv.parentElement.offsetHeight;}
+rsCv();window.addEventListener('resize',rsCv);
+class Pt{
+  constructor(){this.r();}
+  r(){this.x=Math.random()*cv.width;this.y=Math.random()*cv.height;this.s=Math.random()*1.8+.4;this.vx=(Math.random()-.5)*.3;this.vy=(Math.random()-.5)*.3;this.o=Math.random()*.35+.08;}
+  u(){this.x+=this.vx;this.y+=this.vy;
+    const dx=mx-this.x,dy=my-this.y,d=Math.sqrt(dx*dx+dy*dy);
+    if(d<180&&d>0){this.x+=dx*.0006;this.y+=dy*.0006;}
+    if(this.x<-10||this.x>cv.width+10||this.y<-10||this.y>cv.height+10)this.r();
+  }
+  d(){cx.beginPath();cx.arc(this.x,this.y,Math.max(.1,this.s),0,Math.PI*2);cx.fillStyle=`rgba(0,212,170,${this.o})`;cx.fill();}
+}
+for(let i=0;i<50;i++)pts.push(new Pt());
+function aPts(){
+  cx.clearRect(0,0,cv.width,cv.height);
+  pts.forEach(p=>{p.u();p.d();});
+  for(let i=0;i<pts.length;i++){for(let j=i+1;j<pts.length;j++){
+    const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.sqrt(dx*dx+dy*dy);
+    if(d<120){cx.beginPath();cx.moveTo(pts[i].x,pts[i].y);cx.lineTo(pts[j].x,pts[j].y);cx.strokeStyle=`rgba(0,212,170,${(1-d/120)*.06})`;cx.lineWidth=.5;cx.stroke();}
+  }}
+  requestAnimationFrame(aPts);
+}
+aPts();
+
+/* ===== Form ===== */
+function handleSubmit(e){e.preventDefault();document.getElementById('toast').classList.add('show');e.target.reset();setTimeout(()=>document.getElementById('toast').classList.remove('show'),4500);}
+
+/* ===== Smooth scroll ===== */
+document.querySelectorAll('a[href^="#"]').forEach(a=>{a.addEventListener('click',function(e){const t=document.querySelector(this.getAttribute('href'));if(t){e.preventDefault();t.scrollIntoView({behavior:'smooth',block:'start'});}});});
+</script>
+</body>
+</html>
